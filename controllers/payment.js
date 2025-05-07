@@ -1,0 +1,188 @@
+const { instance } = require("../config/razorpay");
+const crypto = require("crypto");
+const User = require("../models/user");
+const Event = require("../models/event");
+const { default: mongoose } = require("mongoose");
+const { sendPaymentSuccessfulEmail } = require("../utils/mailer");
+
+exports.capturePayment = async (req, res) => {
+  try {
+    const { eventId } = req.body;
+    const { userId } = req.user;
+
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(400).json({
+        message: "Event not found",
+      });
+    }
+
+    const uid = new mongoose.Types.ObjectId(userId);
+    if (event.attendees.includes(uid)) {
+      return res.status(400).json({
+        message: "User already joined this event",
+      });
+    }
+
+    const options = {
+      amount: event.price * 100,
+      currency: "INR",
+      receipt: Math.random(Date.now()).toString(),
+    };
+
+    try {
+      // Initiate the payment using Razorpay
+      const paymentResponse = await instance.orders.create(options);
+      console.log(paymentResponse);
+      res.json({
+        success: true,
+        data: paymentResponse,
+      });
+    } catch (error) {
+      console.log(error);
+      res
+        .status(500)
+        .json({ success: false, message: "Could not initiate order." });
+    }
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({
+      message: "Error while creating payment",
+    });
+  }
+};
+
+exports.verifyPayment = async (req, res) => {
+  try {
+    const razorpay_order_id = req.body?.razorpay_order_id;
+    const razorpay_payment_id = req.body?.razorpay_payment_id;
+    const razorpay_signature = req.body?.razorpay_signature;
+    const eventId = req.body?.eventId;
+
+    const { userId } = req.user;
+
+    if (
+      !razorpay_order_id ||
+      !razorpay_payment_id ||
+      !razorpay_signature ||
+      !eventId ||
+      !userId
+    ) {
+      return res.status(400).json({
+        message: "All fields are required",
+      });
+    }
+
+    let body = razorpay_order_id + "|" + razorpay_payment_id;
+
+    const expectedSignature = crypto
+      .createHmac("sha256", process.env.RAZORPAY_SECRET)
+      .update(body.toString())
+      .digest("hex");
+
+    if (expectedSignature === razorpay_signature) {
+      await enrollUser(eventId, userId, res);
+      return res.status(200).json({
+        message: "Event joined successfully",
+      });
+    }
+    return res.status(500).json({
+      message: "Couldn't join event",
+    });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({
+      message: "Error while verifying payment",
+    });
+  }
+};
+
+exports.sendPaymentSuccessEmail = async (req, res) => {
+  try {
+    const { eventId, orderId, paymentId, amount } = req.body;
+
+    const { userId } = req.user;
+
+    if (!orderId || !paymentId || !amount || !userId || !eventId) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Please provide all the details" });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found",
+      });
+    }
+
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({
+        message: "Event not found",
+      });
+    }
+
+    await sendPaymentSuccessfulEmail(
+      user.email,
+      event,
+      orderId,
+      paymentId,
+      amount
+    );
+
+    return res.status(200).json({
+      message: "Mail sent successfully",
+    });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({
+      message: "Error while sending success email",
+    });
+  }
+};
+
+const enrollUser = async (eventId, userId, res) => {
+  try {
+    await Event.findByIdAndUpdate(eventId, {
+      $pull: {
+        approved: userId,
+      },
+    });
+
+    const enrolledEvent = await Event.findOneAndUpdate(
+      { _id: eventId },
+      { $push: { attendees: userId } },
+      { new: true }
+    );
+
+    if (!enrolledEvent) {
+      return res.status(500).json({ success: false, error: "Event not found" });
+    }
+
+    await User.findByIdAndUpdate(userId, {
+      $pull: {
+        approved: eventId,
+      },
+    });
+
+    const enrolledUser = await User.findByIdAndUpdate(
+      userId,
+      {
+        $push: {
+          joined: eventId,
+        },
+      },
+      { new: true }
+    );
+
+    if (!enrolledUser) {
+      return res.status(500).json({ success: false, error: "User not found" });
+    }
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({
+      message: "Error while enrolling",
+    });
+  }
+};
