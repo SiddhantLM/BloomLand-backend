@@ -12,6 +12,7 @@ const {
   getEventApprovedByEventId,
   getEventAttendeesByEventId,
   joinEvent,
+  withdrawRequest,
 } = require("../controllers/eventRequest");
 const { isAuth } = require("../middlewares/isAuth");
 const { isAdmin } = require("../middlewares/isAdmin");
@@ -30,5 +31,6 @@ router.get("/approved/:eventId", isAdmin, getEventApprovedByEventId);
 router.get("/attendees/:eventId", isAdmin, getEventAttendeesByEventId);
 
 router.post("/join", isAuth, joinEvent);
+router.post("/withdraw", isAuth, withdrawRequest);
 
 module.exports = router;

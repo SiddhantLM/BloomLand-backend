@@ -87,6 +87,10 @@ const userSchema = new mongoose.Schema({
       ref: "Event",
     },
   ],
+  isCommunity: {
+    type: Boolean,
+    default: false,
+  },
   created_at: {
     type: Date,
     default: Date.now,

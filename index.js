@@ -64,6 +64,8 @@ const ticketRoutes = require("./routes/ticket");
 const blogRoutes = require("./routes/blog");
 const paymentRoutes = require("./routes/payment");
 const newsletterRoutes = require("./routes/newsletter");
+const communityRoutes = require("./routes/community");
+const invoiceRoutes = require("./routes/invoice");
 app.use("/api/auth", authRoutes);
 app.use("/api/event", eventRoutes);
 app.use("/api/registration_requests", registration_requests);
@@ -73,6 +75,8 @@ app.use("/api/ticket", ticketRoutes);
 app.use("/api/blog", blogRoutes);
 app.use("/api/payment", paymentRoutes);
 app.use("/api/newsletter", newsletterRoutes);
+app.use("/api/community", communityRoutes);
+app.use("/api/invoice", invoiceRoutes);
 
 app.listen(process.env.PORT || 4000, (req, res) => {
   console.log(`Server is running on port ${process.env.PORT}`);

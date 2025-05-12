@@ -270,10 +270,61 @@ async function sendPaymentSuccessfulEmail(
   }
 }
 
+async function sendWelcomeEmail(toEmail, whatsappLink) {
+  const subject = "Welcome to the BloomLand Community! 🌸";
+
+  const message = `
+    <p style="font-size: 16px;">We're thrilled to have you as part of the BloomLand Community!</p>
+    <p style="font-size: 16px;">Join our exclusive WhatsApp group to stay connected, receive updates, and connect with fellow members:</p>
+    <div style="text-align: center; margin: 20px 0;">
+      <h1 style="font-size: 20px">Join the WhatsApp Community</h1>
+      <a href="${whatsappLink}" style="background-color: #F9A26B; color: #ffffff; padding: 10px 20px; border-radius: 5px; text-decoration: none; font-size: 16px;">${whatsappLink}</a>
+    </div>
+    <p style="font-size: 16px;">We can't wait to see you there!</p>
+  `;
+
+  const mailOptions = {
+    from: `"BloomLand"`,
+    to: toEmail,
+    subject: subject,
+    html: `
+      <div style="max-width: 600px; margin: auto; background-color: #ffffff; border: 1px solid #e0e0e0; border-radius: 8px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 30px; color: #333;">
+        <div style="text-align: center; margin-bottom: 30px;">
+          <h1 style="color: #222; font-size: 24px; margin-bottom: 10px;">Welcome to BloomLand!</h1>
+          <p style="font-size: 14px; color: #777;">Your journey to a thriving community starts here</p>
+        </div>
+
+        <p style="font-size: 16px; line-height: 1.5;">Hi there,</p>
+
+        ${message}
+
+        <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+
+        <p style="font-size: 13px; color: #aaa; text-align: center;">
+          If you didn’t sign up for this community, you can safely ignore this email.
+        </p>
+
+        <p style="font-size: 13px; color: #aaa; text-align: center;">
+          © ${new Date().getFullYear()} BloomLand. All rights reserved.
+        </p>
+      </div>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return true;
+  } catch (error) {
+    console.error("Error sending welcome email:", error);
+    return false;
+  }
+}
+
 module.exports = {
   sendOtpEmail,
   sendEventStatusEmail,
   sendResetPasswordEmail,
   sendTicketReplyEmail,
   sendPaymentSuccessfulEmail,
+  sendWelcomeEmail,
 };

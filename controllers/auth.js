@@ -517,7 +517,6 @@ exports.fetchUser = async (req, res) => {
         message: "Access denied",
       });
     }
-    console.log(user);
     const data = {
       name: user.name,
       phone: user.phone,

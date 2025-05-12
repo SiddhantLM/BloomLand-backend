@@ -54,12 +54,9 @@ exports.fetchAllBlogs = async (req, res) => {
     });
   } catch (error) {
     console.log(error);
-    return (
-      res.status(500),
-      json({
-        message: "Error while fetching the blogs",
-      })
-    );
+    return res.status(500).json({
+      message: "Error while fetching the blogs",
+    });
   }
 };
 

@@ -4,6 +4,7 @@ const User = require("../models/user");
 const Event = require("../models/event");
 const { default: mongoose } = require("mongoose");
 const { sendPaymentSuccessfulEmail } = require("../utils/mailer");
+const Invoice = require("../models/invoice");
 
 exports.capturePayment = async (req, res) => {
   try {
@@ -33,7 +34,6 @@ exports.capturePayment = async (req, res) => {
     try {
       // Initiate the payment using Razorpay
       const paymentResponse = await instance.orders.create(options);
-      console.log(paymentResponse);
       res.json({
         success: true,
         data: paymentResponse,
@@ -58,7 +58,7 @@ exports.verifyPayment = async (req, res) => {
     const razorpay_payment_id = req.body?.razorpay_payment_id;
     const razorpay_signature = req.body?.razorpay_signature;
     const eventId = req.body?.eventId;
-
+    const { amount, productType = "Event" } = req.body;
     const { userId } = req.user;
 
     if (
@@ -66,7 +66,8 @@ exports.verifyPayment = async (req, res) => {
       !razorpay_payment_id ||
       !razorpay_signature ||
       !eventId ||
-      !userId
+      !userId ||
+      !amount
     ) {
       return res.status(400).json({
         message: "All fields are required",
@@ -82,8 +83,18 @@ exports.verifyPayment = async (req, res) => {
 
     if (expectedSignature === razorpay_signature) {
       await enrollUser(eventId, userId, res);
+      const invoice = await Invoice.create({
+        order_id: razorpay_order_id,
+        payment_id: razorpay_payment_id,
+        user_id: userId,
+        product_type: productType,
+        product_id: eventId,
+        amount: amount,
+      });
+      await invoice.save;
       return res.status(200).json({
         message: "Event joined successfully",
+        invoice,
       });
     }
     return res.status(500).json({

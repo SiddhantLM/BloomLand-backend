@@ -296,6 +296,12 @@ exports.joinEvent = async (req, res) => {
       });
     }
 
+    if (event.approved.includes(userId)) {
+      return res.status(200).json({
+        message: "Event already joined",
+      });
+    }
+
     await event.updateOne({
       $push: {
         approved: user._id,
@@ -317,6 +323,67 @@ exports.joinEvent = async (req, res) => {
     console.error(error);
     res.status(500).json({
       message: "Error occurred while joining the event",
+    });
+  }
+};
+
+exports.withdrawRequest = async (req, res) => {
+  try {
+    const { eventId } = req.body;
+    if (!eventId) {
+      return res.status(400).json({
+        message: "Event ID is required",
+      });
+    }
+
+    const { userId } = req.user;
+    if (!userId) {
+      return res.status(400).json({
+        message: "User ID is required",
+      });
+    }
+
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(403).json({
+        message: "Event not found",
+      });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(403).json({
+        message: "User not found",
+      });
+    }
+
+    if (!user.approved.includes(eventId)) {
+      return res.status(404).json({
+        message: "Event request not found",
+      });
+    }
+
+    await user.updateOne({
+      $pull: {
+        requests: eventId,
+      },
+    });
+
+    await event.updateOne({
+      $pull: {
+        requests: eventId,
+      },
+    });
+
+    await event.save();
+    await user.save();
+
+    return res.status(200).json({
+      message: "Request withdrew successfully",
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Error while withdrawing the request",
     });
   }
 };
