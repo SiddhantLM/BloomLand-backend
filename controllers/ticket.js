@@ -16,6 +16,7 @@ exports.createTicket = async (req, res) => {
 
     if (req.files && req.files.images) {
       let imgArr = [];
+      console.log(req.files.images);
       if (Array.isArray(req.files.images)) {
         imgArr = req.files.images;
       } else {

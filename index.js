@@ -20,6 +20,8 @@ app.use(
             "http://localhost:3000",
             "http://localhost:5173",
             "http://localhost:4000",
+            "http://192.168.29.18:5173",
+            "https://bloomland-backend.onrender.com",
           ],
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -78,6 +80,7 @@ app.use("/api/newsletter", newsletterRoutes);
 app.use("/api/community", communityRoutes);
 app.use("/api/invoice", invoiceRoutes);
 
+// const hostname = "0.0.0.0";
 app.listen(process.env.PORT || 4000, (req, res) => {
   console.log(`Server is running on port ${process.env.PORT}`);
 });
