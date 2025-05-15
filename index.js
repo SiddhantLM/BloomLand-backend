@@ -15,7 +15,7 @@ app.use(
   cors({
     origin:
       process.env.NODE_ENV === "production"
-        ? process.env.FRONTEND_URL
+        ? process.env.FRONTEND_URL.split(",").map((origin) => origin.trim())
         : [
             "http://localhost:3000",
             "http://localhost:5173",

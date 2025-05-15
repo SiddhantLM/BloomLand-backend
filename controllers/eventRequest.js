@@ -357,7 +357,7 @@ exports.withdrawRequest = async (req, res) => {
       });
     }
 
-    if (!user.approved.includes(eventId)) {
+    if (!user.requests.includes(eventId)) {
       return res.status(404).json({
         message: "Event request not found",
       });

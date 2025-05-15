@@ -236,53 +236,36 @@ exports.sendOtp = async (req, res) => {
 
 exports.updateUser = async (req, res) => {
   try {
-    const allowedFields = {
-      name: "name",
-      phoneNumber: "phone",
-      email: "email",
-    };
-
-    const updates = [];
-    const values = [];
-    let index = 1;
-
-    for (const [key, dbField] of Object.entries(allowedFields)) {
-      if (req.body[key] !== undefined) {
-        updates.push(`${dbField} = $${index}`);
-        values.push(req.body[key]);
-        index++;
-      }
-    }
-
-    if (updates.length === 0) {
-      return res
-        .status(400)
-        .json({ message: "No valid fields provided for update" });
-    }
-
-    values.push(req.user.userId);
-    console.log(values);
-    const query = `
-    UPDATE users
-    SET ${updates.join(", ")}, updated_at = CURRENT_TIMESTAMP
-    WHERE id = $${index}
-    RETURNING id, first_name, last_name, email, role, phone_number;
-  `;
-    try {
-      const result = await client.query(query, values);
-
-      if (result.rows.length === 0) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      return res.status(200).json({
-        message: "User updated successfully",
-        user: result.rows[0],
+    const { name, dob, phone } = req.body;
+    if (!name || !dob || !phone) {
+      return res.status(400).json({
+        message: "All fields are required",
       });
-    } catch (error) {
-      console.error("Error updating user:", error);
-      return res.status(500).json({ message: "Server error" });
     }
+
+    const id = req.user.userId;
+    if (!id) {
+      return res.status(400).json({
+        message: "ID is required",
+      });
+    }
+
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found!",
+      });
+    }
+
+    await user.updateOne({
+      name: name,
+      dob: dob,
+      phone: phone,
+    });
+
+    return res.status(200).json({
+      message: "User updated successfully",
+    });
   } catch (error) {
     console.error("Error in updateUser:", error);
     return res.status(500).json({ message: "Server error" });
@@ -525,6 +508,16 @@ exports.fetchUser = async (req, res) => {
       requests: user.requests,
       joined: user.joined,
       approved: user.approved,
+      dob: user.dob,
+      experience: user.experience,
+      journey: user.journey,
+      reason: user.reason,
+      area: user.area,
+      bloom: user.bloom,
+      ready: user.ready,
+      state: user.state,
+      notes: user.notes,
+      isCommunity: user.isCommunity,
     };
 
     return res.status(200).json({
