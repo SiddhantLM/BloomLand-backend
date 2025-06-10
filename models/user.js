@@ -4,6 +4,7 @@ const userSchema = new mongoose.Schema({
   email: {
     type: String,
     required: true,
+    unique: true,
   },
   password: {
     type: String,
@@ -58,19 +59,25 @@ const userSchema = new mongoose.Schema({
   ready: {
     type: String,
   },
+  insta: {
+    type: String,
+  },
+  linkedin: {
+    type: String,
+  },
   notes: {
     type: String,
   },
   requests: [
     {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Event",
+      ref: "Request",
     },
   ],
   approved: [
     {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Event",
+      ref: "Approved",
     },
   ],
   allowed: {
@@ -84,7 +91,7 @@ const userSchema = new mongoose.Schema({
   joined: [
     {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Event",
+      ref: "Joined",
     },
   ],
   isCommunity: {

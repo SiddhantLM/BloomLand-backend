@@ -236,7 +236,7 @@ exports.sendOtp = async (req, res) => {
 
 exports.updateUser = async (req, res) => {
   try {
-    const { name, dob, phone } = req.body;
+    const { name, dob, phone, insta, linkedin } = req.body;
     if (!name || !dob || !phone) {
       return res.status(400).json({
         message: "All fields are required",
@@ -261,6 +261,8 @@ exports.updateUser = async (req, res) => {
       name: name,
       dob: dob,
       phone: phone,
+      insta: insta,
+      linkedin: linkedin,
     });
 
     return res.status(200).json({
@@ -408,6 +410,8 @@ exports.details = async (req, res) => {
       bloom,
       ready,
       notes,
+      insta,
+      linkedin,
     } = req.body;
     if (
       !name ||
@@ -444,6 +448,8 @@ exports.details = async (req, res) => {
       state: state,
       bloom: bloom,
       ready: ready,
+      insta: insta,
+      linkedin: linkedin,
     });
     if (notes) {
       await user.updateOne({
@@ -492,9 +498,27 @@ exports.fetchUser = async (req, res) => {
     }
 
     const user = await User.findById(id)
-      .populate("requests")
-      .populate("joined")
-      .populate("approved");
+      .populate({
+        path: "requests",
+        populate: [
+          { path: "userId", model: "User" },
+          { path: "eventId", model: "Event" },
+        ],
+      })
+      .populate({
+        path: "joined",
+        populate: [
+          { path: "userId", model: "User" },
+          { path: "eventId", model: "Event" },
+        ],
+      })
+      .populate({
+        path: "approved",
+        populate: [
+          { path: "userId", model: "User" },
+          { path: "eventId", model: "Event" },
+        ],
+      });
     if (!user) {
       return res.status(401).json({
         message: "Access denied",
@@ -516,6 +540,8 @@ exports.fetchUser = async (req, res) => {
       bloom: user.bloom,
       ready: user.ready,
       state: user.state,
+      insta: user.insta,
+      linkedin: user.linkedin,
       notes: user.notes,
       isCommunity: user.isCommunity,
     };
@@ -533,9 +559,28 @@ exports.fetchUser = async (req, res) => {
 
 exports.fetchDetails = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id).populate(
-      "requests approved joined"
-    );
+    const user = await User.findById(req.params.id)
+      .populate({
+        path: "requests",
+        populate: [
+          { path: "userId", model: "User" },
+          { path: "eventId", model: "Event" },
+        ],
+      })
+      .populate({
+        path: "approved",
+        populate: [
+          { path: "userId", model: "User" },
+          { path: "eventId", model: "Event" },
+        ],
+      })
+      .populate({
+        path: "joined",
+        populate: [
+          { path: "userId", model: "User" },
+          { path: "eventId", model: "Event" },
+        ],
+      });
     if (!user) {
       return res.status(400).json({
         message: "Unavle to fetch user",

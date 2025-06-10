@@ -33,6 +33,9 @@ const eventSchema = new mongoose.Schema({
   price: {
     type: Number,
   },
+  subtitle: {
+    type: String,
+  },
   location: {
     city: {
       type: String,
@@ -60,9 +63,49 @@ const eventSchema = new mongoose.Schema({
   },
   includes: [
     {
-      type: String,
+      id: {
+        type: Number,
+      },
+      heading: {
+        type: String,
+      },
+      value: {
+        type: String,
+      },
     },
   ],
+  itinerary: [
+    {
+      id: {
+        type: Number,
+      },
+      date: {
+        type: Date,
+      },
+      title: {
+        type: String,
+      },
+      activities: [
+        {
+          id: {
+            type: Number,
+          },
+          time: {
+            type: String,
+          },
+          description: {
+            type: String,
+          },
+          location: {
+            type: String,
+          },
+        },
+      ],
+    },
+  ],
+  duration: {
+    type: String,
+  },
   scheduled: {
     type: Boolean,
     default: false,
@@ -78,19 +121,19 @@ const eventSchema = new mongoose.Schema({
   requests: [
     {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: "Request",
     },
   ],
   approved: [
     {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: "Approved",
     },
   ],
   attendees: [
     {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: "Joined",
     },
   ],
   created_at: {

@@ -5,6 +5,9 @@ const Event = require("../models/event");
 const { default: mongoose } = require("mongoose");
 const { sendPaymentSuccessfulEmail } = require("../utils/mailer");
 const Invoice = require("../models/invoice");
+const Approved = require("../models/approved");
+const Request = require("../models/request");
+const Joined = require("../models/joined");
 
 exports.capturePayment = async (req, res) => {
   try {
@@ -91,7 +94,7 @@ exports.verifyPayment = async (req, res) => {
         product_id: eventId,
         amount: amount,
       });
-      await invoice.save;
+      await invoice.save();
       return res.status(200).json({
         message: "Event joined successfully",
         invoice,
@@ -155,15 +158,31 @@ exports.sendPaymentSuccessEmail = async (req, res) => {
 
 const enrollUser = async (eventId, userId, res) => {
   try {
-    await Event.findByIdAndUpdate(eventId, {
-      $pull: {
-        approved: userId,
-      },
+    const approved = await Approved.findOne({
+      userId: userId,
+      eventId: eventId,
     });
+    if (!approved) {
+      return res.status(403).json({
+        message: "You have to be accepted for the event first",
+      });
+    }
+    const event = await Event.findByIdAndUpdate(eventId).populate("approved");
+    if (!event) {
+      return res.status(404).json({
+        message: "Event not found",
+      });
+    }
 
+    await approved.updateOne({ $set: { status: "paid" } });
+
+    const joined = await Joined.create({
+      userId: userId,
+      eventId: eventId,
+    });
     const enrolledEvent = await Event.findOneAndUpdate(
       { _id: eventId },
-      { $push: { attendees: userId } },
+      { $push: { attendees: joined._id } },
       { new: true }
     );
 
@@ -171,17 +190,11 @@ const enrollUser = async (eventId, userId, res) => {
       return res.status(500).json({ success: false, error: "Event not found" });
     }
 
-    await User.findByIdAndUpdate(userId, {
-      $pull: {
-        approved: eventId,
-      },
-    });
-
     const enrolledUser = await User.findByIdAndUpdate(
       userId,
       {
         $push: {
-          joined: eventId,
+          joined: joined._id,
         },
       },
       { new: true }

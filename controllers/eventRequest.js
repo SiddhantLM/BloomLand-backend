@@ -1,6 +1,9 @@
 const User = require("../models/user");
 const Event = require("../models/event");
+const Request = require("../models/request");
+const Approved = require("../models/approved");
 const { sendEventStatusEmail } = require("../utils/mailer");
+const Joined = require("../models/joined");
 
 exports.sendEventRequest = async (req, res) => {
   try {
@@ -21,21 +24,33 @@ exports.sendEventRequest = async (req, res) => {
       });
     }
 
-    const requests = user.requests;
-
-    if (!requests.includes(event._id)) {
-      await user.updateOne({
-        $push: {
-          requests: event._id,
-        },
-      });
-
-      await event.updateOne({
-        $push: {
-          requests: user._id,
-        },
+    const existingRequest = await Request.findOne({
+      userId: user._id,
+      eventId: event._id,
+    });
+    if (existingRequest) {
+      return res.status(400).json({
+        message: "You have already sent a request to this event",
       });
     }
+
+    const request = await Request.create({
+      userId: user._id,
+      eventId: event._id,
+    });
+    await request.save();
+
+    await user.updateOne({
+      $push: {
+        requests: request._id,
+      },
+    });
+
+    await event.updateOne({
+      $push: {
+        requests: request._id,
+      },
+    });
 
     await event.save();
     await user.save();
@@ -80,24 +95,33 @@ exports.approveEventRequest = async (req, res) => {
     }
     user.allowed = level;
 
+    //MAKE REQUEST ACCEPTED
+    const request = await Request.findOneAndUpdate(
+      {
+        userId: user._id,
+        eventId: event._id,
+      },
+      {
+        $set: {
+          status: "accepted",
+        },
+      },
+      { new: true }
+    );
+
+    const approved = await Approved.create({
+      userId: user._id,
+      eventId: event._id,
+    });
+
     await user.updateOne({
-      $pull: {
-        requests: event._id,
+      $push: {
+        approved: approved._id,
       },
     });
     await event.updateOne({
-      $pull: {
-        requests: user._id,
-      },
-    });
-    await user.updateOne({
       $push: {
-        approved: event._id,
-      },
-    });
-    await event.updateOne({
-      $push: {
-        approved: user._id,
+        approved: approved._id,
       },
     });
 
@@ -111,7 +135,6 @@ exports.approveEventRequest = async (req, res) => {
     //SEND RESPONSE
     return res.status(200).json({
       message: "Event request approved successfully",
-      eventRequest: result.rows[0],
     });
   } catch (error) {
     console.error(error);
@@ -140,16 +163,18 @@ exports.rejectEventRequest = async (req, res) => {
     }
 
     //UPDATE STATUS
-    await event.updateOne({
-      $pull: {
-        requests: user._id,
+    const request = await Request.findOneAndUpdate(
+      {
+        userId: user._id,
+        eventId: event._id,
       },
-    });
-    await user.updateOne({
-      $pull: {
-        requests: event._id,
+      {
+        $set: {
+          status: "rejected",
+        },
       },
-    });
+      { new: true }
+    );
 
     // SEND REJECTED EMAIL TO THE USER
     await sendEventStatusEmail(user.email, "rejected");
@@ -172,13 +197,12 @@ exports.rejectEventRequest = async (req, res) => {
 
 exports.getEventRequests = async (req, res) => {
   try {
-    const result = await Event.find({}).populate("requests");
-    if (!result) {
+    const requests = await Request.find({}).populate("eventId userId");
+    if (!requests) {
       return res.status(400).json({
-        message: "Event not found",
+        message: "Event Requests not found",
       });
     }
-    const requests = result.map((event) => event.requests);
     return res.status(200).json({ requests });
   } catch (error) {
     console.error(error);
@@ -187,18 +211,13 @@ exports.getEventRequests = async (req, res) => {
 
 exports.getEventApproved = async (req, res) => {
   try {
-    const result = await Event.find({}).populate("approved");
+    const result = await Approved.find({}).populate("eventId userId");
     if (!result) {
       return res.status(400).json({
         message: "Event not found",
       });
     }
-    let approved = [];
-    for (let i = 0; i < result.length; i++) {
-      const app = result[i].approved;
-      approved.push(app);
-    }
-    return res.status(200).json({ approved });
+    return res.status(200).json({ approved: result });
   } catch (error) {
     console.error(error);
   }
@@ -206,18 +225,13 @@ exports.getEventApproved = async (req, res) => {
 
 exports.getEventAttendees = async (req, res) => {
   try {
-    const result = await Event.find({}).populate("attendees");
+    const result = await Joined.find({}).populate("userId eventId");
     if (!result) {
       return res.status(400).json({
         message: "Event not found",
       });
     }
-    let attendees = [];
-    for (let i = 0; i < result.length; i++) {
-      const app = result[i].attendees;
-      attendees.push(app);
-    }
-    return res.status(200).json({ attendees });
+    return res.status(200).json({ attendees: result });
   } catch (error) {
     console.error(error);
   }
@@ -226,14 +240,16 @@ exports.getEventAttendees = async (req, res) => {
 exports.getEventRequestsByEventId = async (req, res) => {
   try {
     const { eventId } = req.params;
-    const result = await Event.findById(eventId).populate("requests");
+    const result = await Request.find({ eventId: eventId }).populate(
+      "userId eventId"
+    );
     if (!result) {
       return res.status(400).json({
         message: "Event not found",
       });
     }
 
-    return res.status(200).json(result.requests);
+    return res.status(200).json(result);
   } catch (error) {
     console.error(error);
   }
@@ -242,14 +258,16 @@ exports.getEventRequestsByEventId = async (req, res) => {
 exports.getEventApprovedByEventId = async (req, res) => {
   try {
     const { eventId } = req.params;
-    const result = await Event.findById(eventId).populate("approved");
+    const result = await Approved.find({ eventId: eventId }).populate(
+      "userId eventId"
+    );
     if (!result) {
       return res.status(400).json({
         message: "Event not found",
       });
     }
 
-    return res.status(200).json(result.approved);
+    return res.status(200).json(result);
   } catch (error) {
     console.error(error);
   }
@@ -258,14 +276,16 @@ exports.getEventApprovedByEventId = async (req, res) => {
 exports.getEventAttendeesByEventId = async (req, res) => {
   try {
     const { eventId } = req.params;
-    const result = await Event.findById(eventId).populate("attendees");
+    const result = await Joined.find({ eventId: eventId }).populate(
+      "userId eventId"
+    );
     if (!result) {
       return res.status(400).json({
         message: "Event not found",
       });
     }
 
-    return res.status(200).json(result.attendees);
+    return res.status(200).json(result);
   } catch (error) {
     console.error(error);
   }
@@ -296,21 +316,47 @@ exports.joinEvent = async (req, res) => {
       });
     }
 
-    if (event.approved.includes(userId)) {
-      return res.status(200).json({
-        message: "Event already joined",
+    const existingRequest = await Request.findOne({
+      userId: userId,
+      eventId: eventId,
+    });
+    if (existingRequest) {
+      return res.status(400).json({
+        message: "You have already requested for this event",
       });
     }
 
+    const request = await Request.create({
+      userId: user._id,
+      eventId: event._id,
+      status: "accepted",
+    });
+
     await event.updateOne({
       $push: {
-        approved: user._id,
+        requests: request._id,
+      },
+    });
+    await user.updateOne({
+      $push: {
+        requests: request._id,
+      },
+    });
+
+    const approved = await Approved.create({
+      userId: user._id,
+      eventId: event._id,
+    });
+
+    await event.updateOne({
+      $push: {
+        approved: approved._id,
       },
     });
 
     await user.updateOne({
       $push: {
-        approved: event._id,
+        approved: approved._id,
       },
     });
     await user.save();
@@ -357,21 +403,27 @@ exports.withdrawRequest = async (req, res) => {
       });
     }
 
-    if (!user.requests.includes(eventId)) {
-      return res.status(404).json({
-        message: "Event request not found",
+    const existingRequest = await Request.findOne({
+      userId: userId,
+      eventId: eventId,
+    });
+    if (!existingRequest) {
+      return res.status(403).json({
+        message: "No pending request found",
       });
     }
 
+    existingRequest.status = "withdrawn";
+
     await user.updateOne({
       $pull: {
-        requests: eventId,
+        requests: existingRequest._id,
       },
     });
 
     await event.updateOne({
       $pull: {
-        requests: eventId,
+        requests: existingRequest._id,
       },
     });
 

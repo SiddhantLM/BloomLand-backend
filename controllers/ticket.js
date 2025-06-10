@@ -22,7 +22,7 @@ exports.createTicket = async (req, res) => {
       } else {
         imgArr.push(req.files.images);
       }
-      const BASE_PATH = "http://localhost:4000/uploads";
+      const BASE_PATH = process.env.BACKEND_URL;
       imageUrls = await Promise.all(
         imgArr.map(async (image) => {
           const safeName = image.name.replace(/[^a-z0-9.\-_]/gi, "_"); // sanitize name

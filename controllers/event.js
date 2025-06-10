@@ -1,7 +1,6 @@
 const fs = require("fs");
 const path = require("path");
-const BASE_PATH = "http://localhost:4000/";
-const client = require("../config/database");
+const BASE_PATH = process.env.BACKEND_URL;
 const Event = require("../models/event");
 
 exports.addEvent = async (req, res) => {
@@ -18,6 +17,9 @@ exports.addEvent = async (req, res) => {
       scheduledFor,
       inclusions,
       price,
+      subtitle,
+      duration,
+      itinerary,
     } = req.body;
 
     if (!title || !description) {
@@ -41,7 +43,7 @@ exports.addEvent = async (req, res) => {
           const filename = Date.now() + "-" + safeName;
           const filePath = path.join(__dirname, "..", "uploads", filename);
           await image.mv(filePath);
-          return `${BASE_PATH}uploads/${filename}`;
+          return `${BASE_PATH}/uploads/${filename}`;
         })
       );
     }
@@ -52,7 +54,7 @@ exports.addEvent = async (req, res) => {
       const filename = `${Date.now()}-${imageName}`;
       const filePath = path.join(__dirname, "..", "uploads", filename);
       await req.files.poster.mv(filePath);
-      poster = `${BASE_PATH}uploads/filename`;
+      poster = `${BASE_PATH}/uploads/${filename}`;
     }
 
     const newEvent = await Event.create({
@@ -61,15 +63,18 @@ exports.addEvent = async (req, res) => {
       start_date: startDate,
       end_date: endDate ? endDate : null,
       location: JSON.parse(location),
-      address: address ? address : null,
+      address: address ? JSON.parse(address) : null,
       category: type,
-      scheduledFor: scheduledFor ? scheduledFor : null,
-      scheduled: scheduledFor ? true : false,
+      schedduledFor: scheduledFor ? scheduledFor : null,
+      scheuled: scheduledFor ? true : false,
       visibility: visibility,
-      includes: inclusions,
+      includes: JSON.parse(inclusions),
       price: price,
       images: imageUrls,
       poster: poster,
+      subtitle: subtitle,
+      duration: duration,
+      itinerary: itinerary ? JSON.parse(itinerary) : null,
     });
     await newEvent.save();
 
@@ -155,6 +160,9 @@ exports.updateEvent = async (req, res) => {
       scheduledFor,
       inclusions,
       price,
+      duration,
+      subtitle,
+      itinerary,
     } = req.body;
     // Ensure eventId exists in the database
     // console.log(id);
@@ -174,7 +182,7 @@ exports.updateEvent = async (req, res) => {
           const filename = Date.now() + "-" + safeName;
           const filePath = path.join(__dirname, "..", "uploads", filename);
           await image.mv(filePath);
-          return `${BASE_PATH}uploads/${filename}`;
+          return `${BASE_PATH}/uploads/${filename}`;
         })
       );
     }
@@ -186,29 +194,47 @@ exports.updateEvent = async (req, res) => {
         imageUrls = [...imageUrls, ...temp];
       }
     }
+    let poster = null;
+    if (req.files && req.files.poster) {
+      const safeName = req.files.poster.name.replace(/[^a-z0-9.\-_]/gi, "_"); // sanitize name
+      const filename = Date.now() + "-" + safeName;
+      const filePath = path.join(__dirname, "..", "uploads", filename);
+      await req.files.poster.mv(filePath);
+      poster = `${BASE_PATH}/uploads/${filename}`;
+    }
     // imageUrls = [...imageUrls, ...req.body.images];
     // console.log("urls", imageUrls);
-    const event = await Event.findById(eventId);
-    if (!event) {
-      return res.status(400).json({ message: "Event not found" });
-    }
 
-    await event.updateOne({
+    const updateData = {
       title: title,
       description: description,
       start_date: startDate,
       end_date: endDate ? endDate : null,
       location: JSON.parse(location),
-      address: address ? address : null,
+      address: address ? JSON.parse(address) : null,
       category: type,
       scheduledFor: scheduledFor ? scheduledFor : null,
       scheduled: scheduledFor ? true : false,
       visibility: visibility,
-      includes: inclusions,
+      includes: inclusions ? JSON.parse(inclusions) : null,
       price: price,
       images: imageUrls,
+      duration: duration,
+      subtitle: subtitle,
+      itinerary: itinerary ? JSON.parse(itinerary) : null,
+    };
+
+    if (poster !== null) {
+      updateData.poster = poster;
+    }
+
+    const event = await Event.findByIdAndUpdate(eventId, updateData, {
+      new: true,
     });
-    await event.save();
+
+    if (!event) {
+      return res.status(400).json({ message: "Event not found" });
+    }
 
     return res.status(200).json({
       message: "Event added successfully",
@@ -262,9 +288,28 @@ exports.getSingleEvent = async (req, res) => {
     if (!eventId) {
       return res.status(400).json({ message: "Event ID is required" });
     }
-    const event = await Event.findById(eventId).populate(
-      "requests attendees approved"
-    );
+    const event = await Event.findById(eventId)
+      .populate({
+        path: "requests",
+        populate: [
+          { path: "userId", model: "User" },
+          { path: "eventId", model: "Event" },
+        ],
+      })
+      .populate({
+        path: "approved",
+        populate: [
+          { path: "userId", model: "User" },
+          { path: "eventId", model: "Event" },
+        ],
+      })
+      .populate({
+        path: "attendees",
+        populate: [
+          { path: "userId", model: "User" },
+          { path: "eventId", model: "Event" },
+        ],
+      });
     if (!event) {
       return res.status(400).json({ message: "Event not found" });
     }
@@ -294,10 +339,13 @@ exports.fetchEventData = async (req, res) => {
         end_data: event.end_date,
         location: event.location,
         address: event.address ? event.address : null,
-        inclusions: event.includes,
+        included: event.includes,
         category: event.category,
         images: event.images,
         poster: event.poster,
+        duration: event.duration,
+        subtitle: event.subtitle,
+        itinerary: event.itinerary,
         _id: event._id,
       };
       data.push(eventData);
