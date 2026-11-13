@@ -6,6 +6,9 @@ const MongoStore = require("connect-mongo");
 const db = require("./config/database");
 const passport = require("passport");
 const session = require("express-session");
+const dns = require("node:dns/promises");
+
+dns.setServers(["1.1.1.1"]);
 require("dotenv").config();
 require("./utils/scheduler");
 
@@ -27,7 +30,7 @@ app.use(
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
-  })
+  }),
 );
 app.use((req, res, next) => {
   res.setHeader("Cross-Origin-Opener-Policy", "unsafe-none");
@@ -52,7 +55,7 @@ app.use(
       httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000,
     },
-  })
+  }),
 );
 
 app.use(passport.initialize());
